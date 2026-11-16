@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Delete User | ScrimSync Admin{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow-sm border-danger">
+            <div class="card-body p-4">
+                <h4 class="card-title text-danger mb-3">Confirm Account Deletion</h4>
+                <p>Are you sure you want to permanently delete <strong>{{ object.username }}</strong> ({{ object.get_role_display }})?</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-danger">Yes, Delete User</button>
+                        <a href="{% url 'accounts:admin_dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

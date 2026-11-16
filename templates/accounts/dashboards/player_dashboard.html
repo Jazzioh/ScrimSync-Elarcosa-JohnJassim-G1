@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Player Dashboard | ScrimSync{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0">Competitive Player Dashboard</h2>
+        <p class="text-muted mb-0">View your assigned team schedule, match alerts, and in-game credentials.</p>
+    </div>
+    <a href="{% url 'accounts:profile_update' %}" class="btn btn-outline-dark">Update IGN / Discord</a>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">My Active Roster</h5>
+                <p class="card-text text-muted small">Your team membership and assigned role will appear here once invited by a Team Manager.</p>
+                <span class="badge bg-secondary">Pending Team Assignment</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">Upcoming Practice Matches</h5>
+                <p class="card-text text-muted small">Confirmed scrimmage times and lobby notifications will appear here.</p>
+                <span class="badge bg-secondary">No Scheduled Matches</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

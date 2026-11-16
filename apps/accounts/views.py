@@ -5,9 +5,16 @@ from django.contrib.auth.views import LoginView, LogoutView
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.views import View
-from django.views.generic import CreateView, DetailView, TemplateView, UpdateView
+from django.views.generic import (
+    CreateView,
+    DeleteView,
+    DetailView,
+    ListView,
+    TemplateView,
+    UpdateView,
+)
 
-from .forms import UserProfileUpdateForm, UserRegistrationForm
+from .forms import AdminUserManageForm, UserProfileUpdateForm, UserRegistrationForm
 from .mixins import RoleRequiredMixin
 from .models import User
 
@@ -25,7 +32,10 @@ class RegisterView(CreateView):
     def form_valid(self, form):
         user = form.save()
         login(self.request, user)
-        messages.success(self.request, f"Welcome to ScrimSync, {user.username}! Your account has been created.")
+        messages.success(
+            self.request,
+            f"Welcome to ScrimSync, {user.username}! Your account has been created.",
+        )
         return redirect(self.success_url)
 
     def form_invalid(self, form):
@@ -58,11 +68,57 @@ class CustomLogoutView(LogoutView):
 class RoleRedirectView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         role_routes = {
+            User.Role.ADMIN: "accounts:admin_dashboard",
             User.Role.TEAM_MANAGER: "accounts:manager_dashboard",
             User.Role.PLAYER: "accounts:player_dashboard",
             User.Role.ORGANIZER: "accounts:organizer_dashboard",
         }
         return redirect(role_routes.get(request.user.role, "accounts:player_dashboard"))
+
+
+class AdminDashboardView(RoleRequiredMixin, ListView):
+    allowed_roles = (User.Role.ADMIN,)
+    model = User
+    template_name = "accounts/dashboards/admin_dashboard.html"
+    context_object_name = "users"
+    ordering = ["-date_joined"]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["total_users"] = User.objects.count()
+        context["manager_count"] = User.objects.filter(role=User.Role.TEAM_MANAGER).count()
+        context["player_count"] = User.objects.filter(role=User.Role.PLAYER).count()
+        context["organizer_count"] = User.objects.filter(role=User.Role.ORGANIZER).count()
+        return context
+
+
+class AdminUserUpdateView(RoleRequiredMixin, UpdateView):
+    allowed_roles = (User.Role.ADMIN,)
+    model = User
+    form_class = AdminUserManageForm
+    template_name = "accounts/admin_user_edit.html"
+    success_url = reverse_lazy("accounts:admin_dashboard")
+
+    def form_valid(self, form):
+        messages.success(self.request, f"Updated account for {form.instance.username}.")
+        return super().form_valid(form)
+
+
+class AdminUserDeleteView(RoleRequiredMixin, DeleteView):
+    allowed_roles = (User.Role.ADMIN,)
+    model = User
+    template_name = "accounts/admin_user_confirm_delete.html"
+    success_url = reverse_lazy("accounts:admin_dashboard")
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and str(request.user.pk) == str(kwargs.get("pk")):
+            messages.error(request, "You cannot delete your own admin account.")
+            return redirect("accounts:admin_dashboard")
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        messages.success(self.request, f"Deleted user account '{self.object.username}'.")
+        return super().form_valid(form)
 
 
 class ManagerDashboardView(RoleRequiredMixin, TemplateView):

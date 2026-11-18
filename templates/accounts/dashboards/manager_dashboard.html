@@ -5,36 +5,58 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="mb-0">Team Manager Dashboard</h2>
-        <p class="text-muted mb-0">Manage your roster, sync availability calendars, and queue for scrims.</p>
+        <p class="text-muted mb-0">Manage your roster, review player join requests, and queue for scrims.</p>
     </div>
-    <a href="{% url 'accounts:profile_detail' %}" class="btn btn-outline-dark">Manager Profile</a>
+    <div class="d-flex gap-2">
+        <a href="{% url 'scrims:team_create' %}" class="btn btn-primary">+ Create Team</a>
+        <a href="{% url 'scrims:scrim_create' %}" class="btn btn-success">+ Post Scrim Challenge</a>
+        <a href="{% url 'accounts:profile_detail' %}" class="btn btn-outline-dark">Manager Profile</a>
+    </div>
 </div>
 
 <div class="row g-3">
     <div class="col-md-4">
         <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Team Roster</h5>
-                <p class="card-text text-muted small">Create your team profile and assign active competitive players.</p>
-                <span class="badge bg-secondary">Coming in Phase 2</span>
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">Team Roster & Join Requests</h5>
+                <p class="card-text text-muted small">Create your team profile, assign active competitive players, and approve incoming squad requests.</p>
+                {% if user.managed_teams.all %}
+                    <ul class="list-group list-group-flush mb-3">
+                        {% for team in user.managed_teams.all %}
+                        <li class="list-group-item px-0 py-1 d-flex justify-content-between align-items-center small">
+                            <span><strong>[{{ team.tag }}]</strong> {{ team.name }}</span>
+                            <a href="{% url 'scrims:team_edit' team.pk %}" class="text-decoration-none">Edit</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                <div class="mt-auto">
+                    <a href="{% url 'scrims:team_list' %}" class="btn btn-sm btn-outline-primary">Manage Teams & Requests</a>
+                </div>
             </div>
         </div>
     </div>
+
     <div class="col-md-4">
         <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Availability Calendar</h5>
-                <p class="card-text text-muted small">Set weekly scrimmage windows to prevent double-bookings.</p>
-                <span class="badge bg-secondary">Coming in Phase 2</span>
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">Scrimmage Schedule</h5>
+                <p class="card-text text-muted small">Post scrimmage time slots with automatic 2-hour conflict detection to prevent double-bookings.</p>
+                <div class="mt-auto">
+                    <a href="{% url 'scrims:scrim_create' %}" class="btn btn-sm btn-outline-primary">Schedule a Scrimmage</a>
+                </div>
             </div>
         </div>
     </div>
+
     <div class="col-md-4">
         <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Skill-Tier Matchmaking</h5>
-                <p class="card-text text-muted small">Find evenly matched opponents based on rank tier and schedule.</p>
-                <span class="badge bg-secondary">Coming in Phase 2</span>
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">Scrimmage Matchmaking</h5>
+                <p class="card-text text-muted small">Browse open challenges by game title and confirm practice matches against rival squads.</p>
+                <div class="mt-auto">
+                    <a href="{% url 'scrims:scrim_list' %}" class="btn btn-sm btn-outline-success">Open Scrim Board</a>
+                </div>
             </div>
         </div>
     </div>

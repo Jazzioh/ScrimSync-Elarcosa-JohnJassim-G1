@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{% if object %}Edit Team{% else %}Create Team{% endif %} | ScrimSync{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h3 class="card-title mb-3">{% if object %}Edit Team: {{ object.name }}{% else %}Register New Esports Team{% endif %}</h3>
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% for field in form %}
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors|striptags }}</div>{% endif %}
+                        </div>
+                    {% endfor %}
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">Save Team</button>
+                        <a href="{% url 'scrims:team_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

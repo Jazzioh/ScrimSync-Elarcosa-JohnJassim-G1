@@ -15,9 +15,15 @@
 
 <div class="row g-3">
     <div class="col-md-6">
+<<<<<<< HEAD
+        <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">My Active Roster</h5>
+=======
         <div class="card shadow-sm h-100">
             <div class="card-body">
                 <h5 class="card-title">My Active Squads</h5>
+>>>>>>> develop
                 {% if user.joined_teams.all %}
                     <ul class="list-group list-group-flush mb-3">
                         {% for team in user.joined_teams.all %}
@@ -32,6 +38,15 @@
                         {% endfor %}
                     </ul>
                 {% else %}
+<<<<<<< HEAD
+                    <p class="card-text text-muted small">
+                        You are not on an active roster yet. Browse registered squads and submit a join request to a Team Manager.
+                    </p>
+                {% endif %}
+                <div class="mt-auto">
+                    <a href="{% url 'scrims:team_list' %}" class="btn btn-sm btn-outline-primary">Browse & Request to Join Squads</a>
+                </div>
+=======
                     <p class="text-muted small">
                         You are not on an active roster yet. Browse registered squads and send a join request to a Team Manager.
                     </p>
@@ -39,16 +54,27 @@
                 <a href="{% url 'scrims:team_list' %}" class="btn btn-sm btn-outline-primary">
                     Browse & Request to Join Squads
                 </a>
+>>>>>>> develop
             </div>
         </div>
     </div>
 
     <div class="col-md-6">
+<<<<<<< HEAD
+        <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">Upcoming Practice Matches</h5>
+                <p class="card-text text-muted small">View open challenges and confirmed scrimmage schedules across the matchmaking board.</p>
+                <div class="mt-auto">
+                    <a href="{% url 'scrims:scrim_list' %}" class="btn btn-sm btn-outline-primary">View Scrim Board</a>
+                </div>
+=======
         <div class="card shadow-sm h-100">
             <div class="card-body">
                 <h5 class="card-title">Upcoming Practice Matches</h5>
                 <p class="text-muted small">Confirmed scrimmage times and lobby notifications for your squads will appear here.</p>
                 <span class="badge bg-secondary">No Scheduled Matches</span>
+>>>>>>> develop
             </div>
         </div>
     </div>

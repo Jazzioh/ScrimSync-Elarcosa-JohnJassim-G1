@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Accept Scrimmage Challenge | ScrimSync{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Accept Scrimmage Challenge</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-light border mb-3">
+                    <p class="mb-1"><strong>Host Squad:</strong> [{{ object.host_team.tag }}] {{ object.host_team.name }}</p>
+                    <p class="mb-1"><strong>Game:</strong> {{ object.host_team.get_game_title_display }}</p>
+                    <p class="mb-1"><strong>Scheduled Time:</strong> {{ object.scheduled_at|date:"M d, Y - h:i A" }}</p>
+                    <p class="mb-0"><strong>Server Region:</strong> {{ object.server_region|default:"Default" }}</p>
+                </div>
+
+                {% if form.errors %}
+                    <div class="alert alert-danger">
+                        {% for field in form %}
+                            {% for error in field.errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        {% endfor %}
+                        {% for error in form.non_field_errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% if form.fields.opponent_team.queryset.exists %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Select Your Challenging Squad</label>
+                            {{ form.opponent_team }}
+                            <div class="form-text">Only your teams registered under {{ object.host_team.get_game_title_display }} are listed.</div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'scrims:scrim_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-success">Confirm & Accept Challenge</button>
+                        </div>
+                    </form>
+                {% else %}
+                    <div class="alert alert-warning">
+                        You do not manage an eligible opposing squad for <strong>{{ object.host_team.get_game_title_display }}</strong>.
+                        <a href="{% url 'scrims:team_create' %}" class="alert-link">Create a squad</a> first to accept this challenge.
+                    </div>
+                    <a href="{% url 'scrims:scrim_list' %}" class="btn btn-outline-secondary">Back to Scrim Board</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,15 +1,11 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Prefetch
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views import View
-from django.views.generic import CreateView, DeleteView, ListView, UpdateView
-
-from apps.accounts.mixins import RoleRequiredMixin
-from apps.accounts.models import User
-from .forms import TeamForm
-from .models import Team, TeamJoinRequest
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from .models import Team, TeamJoinRequest, Scrimmage
+from .forms import TeamForm, TeamJoinRequestForm, ScrimmageForm, ScrimmageAcceptForm
 
 
 class TeamListView(LoginRequiredMixin, ListView):
@@ -18,127 +14,186 @@ class TeamListView(LoginRequiredMixin, ListView):
     context_object_name = "teams"
 
     def get_queryset(self):
-        user = self.request.user
-        pending_qs = TeamJoinRequest.objects.filter(
-            status=TeamJoinRequest.Status.PENDING
-        ).select_related("player")
-        base_qs = Team.objects.select_related("manager").prefetch_related(
-            "players",
-            Prefetch("join_requests", queryset=pending_qs, to_attr="pending_requests"),
-        )
-        if user.role == User.Role.TEAM_MANAGER:
-            return base_qs.filter(manager=user)
-        return base_qs
+        return Team.objects.select_related("manager").prefetch_related("members", "join_requests__player").order_by("name")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        if self.request.user.role == User.Role.PLAYER:
-            context["pending_team_ids"] = set(
-                TeamJoinRequest.objects.filter(
-                    player=self.request.user,
-                    status=TeamJoinRequest.Status.PENDING,
-                ).values_list("team_id", flat=True)
-            )
-        else:
-            context["pending_team_ids"] = set()
+        context["join_form"] = TeamJoinRequestForm()
         return context
 
 
-class TeamCreateView(RoleRequiredMixin, CreateView):
-    allowed_roles = (User.Role.TEAM_MANAGER, User.Role.ADMIN)
+class TeamCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     model = Team
     form_class = TeamForm
     template_name = "scrims/team_form.html"
     success_url = reverse_lazy("scrims:team_list")
+
+    def test_func(self):
+        return self.request.user.role in ["MANAGER", "ADMIN"] or self.request.user.is_superuser
 
     def form_valid(self, form):
         form.instance.manager = self.request.user
-        messages.success(self.request, f"Team '{form.instance.name}' created successfully.")
+        messages.success(self.request, "Team created successfully!")
         return super().form_valid(form)
 
 
-class TeamUpdateView(RoleRequiredMixin, UpdateView):
-    allowed_roles = (User.Role.TEAM_MANAGER, User.Role.ADMIN)
+class TeamUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = Team
     form_class = TeamForm
     template_name = "scrims/team_form.html"
     success_url = reverse_lazy("scrims:team_list")
 
-    def get_queryset(self):
-        if self.request.user.role == User.Role.ADMIN:
-            return Team.objects.all()
-        return Team.objects.filter(manager=self.request.user)
+    def test_func(self):
+        team = self.get_object()
+        return team.manager == self.request.user or self.request.user.role == "ADMIN" or self.request.user.is_superuser
 
     def form_valid(self, form):
-        messages.success(self.request, f"Team '{form.instance.name}' updated.")
+        messages.success(self.request, "Team roster details updated.")
         return super().form_valid(form)
 
 
-class TeamDeleteView(RoleRequiredMixin, DeleteView):
-    allowed_roles = (User.Role.TEAM_MANAGER, User.Role.ADMIN)
+class TeamDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Team
     template_name = "scrims/team_confirm_delete.html"
     success_url = reverse_lazy("scrims:team_list")
 
-    def get_queryset(self):
-        if self.request.user.role == User.Role.ADMIN:
-            return Team.objects.all()
-        return Team.objects.filter(manager=self.request.user)
-
-    def form_valid(self, form):
-        messages.success(self.request, f"Disbanded team '{self.object.name}'.")
-        return super().form_valid(form)
+    def test_func(self):
+        team = self.get_object()
+        return team.manager == self.request.user or self.request.user.role == "ADMIN" or self.request.user.is_superuser
 
 
-class TeamJoinRequestCreateView(RoleRequiredMixin, View):
-    allowed_roles = (User.Role.PLAYER,)
-
+class TeamJoinRequestCreateView(LoginRequiredMixin, View):
     def post(self, request, pk):
         team = get_object_or_404(Team, pk=pk)
-        if team.players.filter(pk=request.user.pk).exists():
-            messages.info(request, f"You are already on the roster of {team.name}.")
+        if request.user in team.members.all() or team.manager == request.user:
+            messages.warning(request, "You are already part of this team.")
             return redirect("scrims:team_list")
 
-        already_pending = TeamJoinRequest.objects.filter(
-            team=team,
-            player=request.user,
-            status=TeamJoinRequest.Status.PENDING,
-        ).exists()
-        if already_pending:
-            messages.warning(request, f"You already have a pending join request for {team.name}.")
+        existing = TeamJoinRequest.objects.filter(team=team, player=request.user, status="PENDING").exists()
+        if existing:
+            messages.info(request, "You already have a pending join request for this team.")
             return redirect("scrims:team_list")
 
-        note = request.POST.get("message", "").strip()[:150]
-        TeamJoinRequest.objects.create(team=team, player=request.user, message=note)
-        messages.success(request, f"Join request sent to [{team.tag}] {team.name}!")
+        form = TeamJoinRequestForm(request.POST)
+        if form.is_valid():
+            join_req = form.save(commit=False)
+            join_req.team = team
+            join_req.player = request.user
+            join_req.save()
+            messages.success(request, f"Join request sent to {team.name}!")
         return redirect("scrims:team_list")
 
 
-class TeamJoinRequestRespondView(RoleRequiredMixin, View):
-    allowed_roles = (User.Role.TEAM_MANAGER, User.Role.ADMIN)
-
+class TeamJoinRequestRespondView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        join_req = get_object_or_404(
-            TeamJoinRequest.objects.select_related("team", "player"),
-            pk=pk,
-            status=TeamJoinRequest.Status.PENDING,
-        )
-        if request.user.role != User.Role.ADMIN and join_req.team.manager != request.user:
-            messages.error(request, "You do not have permission to review requests for this team.")
+        join_req = get_object_or_404(TeamJoinRequest, pk=pk)
+        if join_req.team.manager != request.user and not request.user.is_superuser:
+            messages.error(request, "Only the Team Manager can approve or decline requests.")
             return redirect("scrims:team_list")
 
         action = request.POST.get("action")
         if action == "accept":
-            join_req.status = TeamJoinRequest.Status.ACCEPTED
+            join_req.status = "ACCEPTED"
             join_req.save()
-            join_req.team.players.add(join_req.player)
-            messages.success(
-                request,
-                f"Accepted {join_req.player.in_game_name or join_req.player.username} into [{join_req.team.tag}] {join_req.team.name}.",
-            )
-        elif action == "reject":
-            join_req.status = TeamJoinRequest.Status.REJECTED
+            join_req.team.members.add(join_req.player)
+            messages.success(request, f"{join_req.player.username} added to {join_req.team.name}!")
+        elif action == "decline":
+            join_req.status = "DECLINED"
             join_req.save()
-            messages.info(request, f"Declined join request from {join_req.player.username}.")
-
+            messages.info(request, f"Request from {join_req.player.username} declined.")
         return redirect("scrims:team_list")
+
+
+class ScrimmageListView(LoginRequiredMixin, ListView):
+    model = Scrimmage
+    template_name = "scrims/scrimmage_list.html"
+    context_object_name = "scrimmages"
+
+    def get_queryset(self):
+        qs = Scrimmage.objects.select_related("host_team", "opponent_team").order_by("scheduled_at")
+        game = self.request.GET.get("game")
+        status = self.request.GET.get("status")
+        if game:
+            qs = qs.filter(host_team__game_title=game)
+        if status:
+            qs = qs.filter(status=status)
+        return qs
+
+
+class ScrimmageCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
+    model = Scrimmage
+    form_class = ScrimmageForm
+    template_name = "scrims/scrimmage_form.html"
+    success_url = reverse_lazy("scrims:scrim_list")
+
+    def test_func(self):
+        return self.request.user.role in ["MANAGER", "ADMIN"] or self.request.user.is_superuser
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        messages.success(self.request, "Scrimmage challenge posted to the Scrim Board!")
+        return super().form_valid(form)
+
+
+class ScrimmageUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    model = Scrimmage
+    form_class = ScrimmageForm
+    template_name = "scrims/scrimmage_form.html"
+    success_url = reverse_lazy("scrims:scrim_list")
+
+    def test_func(self):
+        scrim = self.get_object()
+        return (
+            scrim.host_team.manager == self.request.user
+            or self.request.user.role in ["ORGANIZER", "ADMIN"]
+            or self.request.user.is_superuser
+        )
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        messages.success(self.request, "Scrimmage details updated.")
+        return super().form_valid(form)
+
+
+class ScrimmageAcceptView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    model = Scrimmage
+    form_class = ScrimmageAcceptForm
+    template_name = "scrims/scrimmage_accept.html"
+    success_url = reverse_lazy("scrims:scrim_list")
+
+    def test_func(self):
+        return self.request.user.role in ["MANAGER", "ADMIN"] or self.request.user.is_superuser
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        kwargs["scrimmage"] = self.get_object()
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.status = "CONFIRMED"
+        messages.success(self.request, "Scrimmage challenge accepted! Match is now confirmed.")
+        return super().form_valid(form)
+
+
+class ScrimmageDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    model = Scrimmage
+    template_name = "scrims/scrimmage_confirm_delete.html"
+    success_url = reverse_lazy("scrims:scrim_list")
+
+    def test_func(self):
+        scrim = self.get_object()
+        return (
+            scrim.host_team.manager == self.request.user
+            or self.request.user.role in ["ORGANIZER", "ADMIN"]
+            or self.request.user.is_superuser
+        )

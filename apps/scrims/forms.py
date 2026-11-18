@@ -91,12 +91,17 @@ class ScrimmageAcceptForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.scrimmage = scrimmage
         if user and scrimmage:
+            self.fields["opponent_team"].required = True
+            self.fields["opponent_team"].empty_label = "Select your challenging squad..."
             self.fields["opponent_team"].queryset = Team.objects.filter(
                 manager=user, game_title=scrimmage.host_team.game_title
             ).exclude(pk=scrimmage.host_team.pk)
 
     def clean_opponent_team(self):
         opponent = self.cleaned_data.get("opponent_team")
+        if not opponent:
+            raise forms.ValidationError("Please select one of your squads before accepting this challenge.")
         if self.scrimmage and opponent == self.scrimmage.host_team:
             raise forms.ValidationError("A team cannot accept its own scrimmage challenge.")
         return opponent
+

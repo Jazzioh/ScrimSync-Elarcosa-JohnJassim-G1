@@ -1,4 +1,4 @@
-from django.contrib import messages
+﻿from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView, LogoutView
@@ -126,9 +126,15 @@ class ManagerDashboardView(RoleRequiredMixin, TemplateView):
     template_name = "accounts/dashboards/manager_dashboard.html"
 
 
-class PlayerDashboardView(RoleRequiredMixin, TemplateView):
-    allowed_roles = (User.Role.PLAYER,)
+class PlayerDashboardView(LoginRequiredMixin, TemplateView):
     template_name = "accounts/dashboards/player_dashboard.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from apps.scrims.models import Team
+        m2m_name = Team._meta.many_to_many[0].name if Team._meta.many_to_many else None
+        context["my_teams"] = Team.objects.filter(**{m2m_name: self.request.user}) if m2m_name else Team.objects.none()
+        return context
 
 
 class OrganizerDashboardView(RoleRequiredMixin, TemplateView):

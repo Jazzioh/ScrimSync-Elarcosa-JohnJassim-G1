@@ -1,4 +1,4 @@
-from django.contrib import messages
+﻿from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
@@ -14,11 +14,18 @@ class TeamListView(LoginRequiredMixin, ListView):
     context_object_name = "teams"
 
     def get_queryset(self):
-        return Team.objects.select_related("manager").prefetch_related("members", "join_requests__player").order_by("name")
+        return Team.objects.select_related("manager").prefetch_related(*[f.name for f in Team._meta.many_to_many], "join_requests__player").order_by("name")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["join_form"] = TeamJoinRequestForm()
+        m2m_name = Team._meta.many_to_many[0].name if Team._meta.many_to_many else None
+        user_teams = Team.objects.filter(**{m2m_name: self.request.user}) if (m2m_name and self.request.user.is_authenticated) else Team.objects.none()
+        context["joined_games"] = set(user_teams.values_list("game_title", flat=True))
+        context["joined_team_ids"] = set(user_teams.values_list("id", flat=True))
+        m2m_name = Team._meta.many_to_many[0].name if Team._meta.many_to_many else None
+        for team in context["teams"]:
+            team.active_roster = getattr(team, m2m_name).all() if m2m_name else []
         return context
 
 
@@ -29,7 +36,7 @@ class TeamCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     success_url = reverse_lazy("scrims:team_list")
 
     def test_func(self):
-        return self.request.user.role in ["MANAGER", "ADMIN"] or self.request.user.is_superuser
+        return self.request.user.role in ["TEAM_MANAGER", "MANAGER", "ADMIN"] or self.request.user.is_superuser
 
     def form_valid(self, form):
         form.instance.manager = self.request.user
@@ -61,11 +68,22 @@ class TeamDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         team = self.get_object()
         return team.manager == self.request.user or self.request.user.role == "ADMIN" or self.request.user.is_superuser
 
+    def form_valid(self, form):
+        messages.success(self.request, "Squad deleted successfully.")
+        return super().form_valid(form)
+
 
 class TeamJoinRequestCreateView(LoginRequiredMixin, View):
     def post(self, request, pk):
         team = get_object_or_404(Team, pk=pk)
-        if request.user in team.members.all() or team.manager == request.user:
+        m2m_name = Team._meta.many_to_many[0].name
+        if request.user in getattr(team, m2m_name).all() or team.manager == request.user:
+            messages.warning(request, "You are already part of this team.")
+            return redirect("scrims:team_list")
+        if Team.objects.filter(**{m2m_name: request.user, "game_title": team.game_title}).exists():
+            messages.warning(request, f"You are already on an active {team.get_game_title_display()} roster.")
+            return redirect("scrims:team_list")
+        if False:
             messages.warning(request, "You are already part of this team.")
             return redirect("scrims:team_list")
 
@@ -95,7 +113,7 @@ class TeamJoinRequestRespondView(LoginRequiredMixin, View):
         if action == "accept":
             join_req.status = "ACCEPTED"
             join_req.save()
-            join_req.team.members.add(join_req.player)
+            getattr(join_req.team, Team._meta.many_to_many[0].name).add(join_req.player)
             messages.success(request, f"{join_req.player.username} added to {join_req.team.name}!")
         elif action == "decline":
             join_req.status = "DECLINED"
@@ -127,7 +145,7 @@ class ScrimmageCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     success_url = reverse_lazy("scrims:scrim_list")
 
     def test_func(self):
-        return self.request.user.role in ["MANAGER", "ADMIN"] or self.request.user.is_superuser
+        return self.request.user.role in ["TEAM_MANAGER", "MANAGER", "ADMIN"] or self.request.user.is_superuser
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -171,7 +189,7 @@ class ScrimmageAcceptView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     success_url = reverse_lazy("scrims:scrim_list")
 
     def test_func(self):
-        return self.request.user.role in ["MANAGER", "ADMIN"] or self.request.user.is_superuser
+        return self.request.user.role in ["TEAM_MANAGER", "MANAGER", "ADMIN"] or self.request.user.is_superuser
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -197,3 +215,11 @@ class ScrimmageDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
             or self.request.user.role in ["ORGANIZER", "ADMIN"]
             or self.request.user.is_superuser
         )
+
+    def form_valid(self, form):
+        messages.success(self.request, "Scrimmage record cancelled and deleted.")
+        return super().form_valid(form)
+
+
+
+

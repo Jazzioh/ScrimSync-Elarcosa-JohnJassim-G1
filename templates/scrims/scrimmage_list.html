@@ -1,0 +1,70 @@
+﻿{% extends "base.html" %}
+{% block title %}Scrim Board | ScrimSync{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0">Scrimmage Matchmaking Board</h2>
+        <p class="text-muted mb-0">Browse open practice challenges, accept opponents, and track scheduled scrims.</p>
+    </div>
+    {% if user.role == "TEAM_MANAGER" or user.role == "MANAGER" or user.role == "ADMIN" or user.is_superuser %}
+        <a href="{% url 'scrims:scrim_create' %}" class="btn btn-primary">+ Post Scrim Challenge</a>
+    {% endif %}
+</div>
+
+{% if scrimmages %}
+    <div class="row g-3">
+        {% for scrim in scrimmages %}
+        <div class="col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="badge bg-dark">{{ scrim.host_team.get_game_title_display }}</span>
+                        {% if scrim.status == "OPEN" %}
+                            <span class="badge bg-warning text-dark">Open Challenge</span>
+                        {% elif scrim.status == "CONFIRMED" %}
+                            <span class="badge bg-success">Confirmed / Scheduled</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ scrim.get_status_display }}</span>
+                        {% endif %}
+                    </div>
+
+                    <h5 class="card-title mb-1">
+                        [{{ scrim.host_team.tag }}] {{ scrim.host_team.name }}
+                        <span class="text-muted fw-normal">vs</span>
+                        {% if scrim.opponent_team %}
+                            [{{ scrim.opponent_team.tag }}] {{ scrim.opponent_team.name }}
+                        {% else %}
+                            <span class="text-muted fst-italic">Awaiting Challenger</span>
+                        {% endif %}
+                    </h5>
+
+                    <p class="small text-muted mb-2">
+                        <strong>Time:</strong> {{ scrim.scheduled_at|date:"M d, Y - h:i A" }}
+                        {% if scrim.server_region %} · <strong>Server:</strong> {{ scrim.server_region }}{% endif %}
+                    </p>
+
+                    {% if scrim.notes %}
+                        <p class="small mb-3">{{ scrim.notes }}</p>
+                    {% endif %}
+
+                    <div class="d-flex gap-2 mt-auto">
+                        {% if scrim.status == "OPEN" and user.role == "TEAM_MANAGER" or user.role == "MANAGER" and scrim.host_team.manager != user %}
+                            <a href="{% url 'scrims:scrim_accept' scrim.pk %}" class="btn btn-sm btn-success">Accept Challenge</a>
+                        {% endif %}
+                        {% if scrim.host_team.manager == user or user.role == "ORGANIZER" or user.role == "ADMIN" or user.is_superuser %}
+                            <a href="{% url 'scrims:scrim_edit' scrim.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <a href="{% url 'scrims:scrim_delete' scrim.pk %}" class="btn btn-sm btn-outline-danger">Delete</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-info">No scrimmage challenges posted yet.</div>
+{% endif %}
+{% endblock %}
+
+

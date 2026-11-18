@@ -16,6 +16,7 @@
                         {{ user.username }} ({{ user.get_role_display }})
                     </span>
                     <a class="nav-link" href="{% url 'accounts:role_redirect' %}">Dashboard</a>
+                    <a class="nav-link" href="{% url 'scrims:team_list' %}">Teams</a>
                     <a class="nav-link" href="{% url 'accounts:profile_detail' %}">Profile</a>
                     <form method="post" action="{% url 'accounts:logout' %}" class="d-inline">
                         {% csrf_token %}

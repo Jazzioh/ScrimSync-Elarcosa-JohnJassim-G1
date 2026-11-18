@@ -7,24 +7,47 @@
         <h2 class="mb-0">Competitive Player Dashboard</h2>
         <p class="text-muted mb-0">View your assigned team schedule, match alerts, and in-game credentials.</p>
     </div>
-    <a href="{% url 'accounts:profile_update' %}" class="btn btn-outline-dark">Update IGN / Discord</a>
+    <div class="d-flex gap-2">
+        <a href="{% url 'scrims:team_list' %}" class="btn btn-primary">Browse Squads</a>
+        <a href="{% url 'accounts:profile_update' %}" class="btn btn-outline-dark">Update IGN / Discord</a>
+    </div>
 </div>
 
 <div class="row g-3">
     <div class="col-md-6">
-        <div class="card h-100 shadow-sm">
+        <div class="card shadow-sm h-100">
             <div class="card-body">
-                <h5 class="card-title">My Active Roster</h5>
-                <p class="card-text text-muted small">Your team membership and assigned role will appear here once invited by a Team Manager.</p>
-                <span class="badge bg-secondary">Pending Team Assignment</span>
+                <h5 class="card-title">My Active Squads</h5>
+                {% if user.joined_teams.all %}
+                    <ul class="list-group list-group-flush mb-3">
+                        {% for team in user.joined_teams.all %}
+                        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-dark me-1">{{ team.tag }}</span>
+                                <strong>{{ team.name }}</strong>
+                                <span class="text-muted small">({{ team.get_game_title_display }})</span>
+                            </div>
+                            <span class="badge bg-success">Active Member</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted small">
+                        You are not on an active roster yet. Browse registered squads and send a join request to a Team Manager.
+                    </p>
+                {% endif %}
+                <a href="{% url 'scrims:team_list' %}" class="btn btn-sm btn-outline-primary">
+                    Browse & Request to Join Squads
+                </a>
             </div>
         </div>
     </div>
+
     <div class="col-md-6">
-        <div class="card h-100 shadow-sm">
+        <div class="card shadow-sm h-100">
             <div class="card-body">
                 <h5 class="card-title">Upcoming Practice Matches</h5>
-                <p class="card-text text-muted small">Confirmed scrimmage times and lobby notifications will appear here.</p>
+                <p class="text-muted small">Confirmed scrimmage times and lobby notifications for your squads will appear here.</p>
                 <span class="badge bg-secondary">No Scheduled Matches</span>
             </div>
         </div>

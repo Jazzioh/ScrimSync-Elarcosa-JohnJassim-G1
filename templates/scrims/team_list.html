@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Teams & Rosters | ScrimSync{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0">Teams & Active Rosters</h2>
+        <p class="text-muted mb-0">
+            {% if user.role == "PLAYER" %}
+                Browse competitive squads, view your active teams, or request to join a roster.
+            {% else %}
+                Manage competitive esports rosters, direct player assignments, and join requests.
+            {% endif %}
+        </p>
+    </div>
+    {% if user.role == "TEAM_MANAGER" or user.role == "ADMIN" %}
+        <a href="{% url 'scrims:team_create' %}" class="btn btn-primary">+ Create Team</a>
+    {% endif %}
+</div>
+
+<div class="row g-3">
+    {% for team in teams %}
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <span class="badge bg-dark me-1">{{ team.tag }}</span>
+                        <span class="badge bg-primary">{{ team.get_game_title_display }}</span>
+                        <span class="badge bg-secondary">{{ team.get_skill_tier_display }}</span>
+                    </div>
+                    {% if user == team.manager or user.role == "ADMIN" %}
+                    <div class="btn-group btn-group-sm">
+                        <a href="{% url 'scrims:team_edit' team.pk %}" class="btn btn-outline-primary">Edit</a>
+                        <a href="{% url 'scrims:team_delete' team.pk %}" class="btn btn-outline-danger">Delete</a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <h5 class="card-title mt-2">{{ team.name }}</h5>
+                <p class="text-muted small mb-2">Manager: <strong>{{ team.manager.username }}</strong></p>
+                {% if team.description %}<p class="small">{{ team.description }}</p>{% endif %}
+
+                <hr>
+                <p class="small fw-semibold mb-1">Active Roster ({{ team.players.count }}):</p>
+                {% if team.players.all %}
+                    <div class="d-flex flex-wrap gap-1 mb-3">
+                        {% for p in team.players.all %}
+                            <span class="badge bg-light text-dark border">{{ p.in_game_name|default:p.username }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted small mb-3">No players assigned yet.</p>
+                {% endif %}
+
+                {% if user.role == "PLAYER" %}
+                    {% if user in team.players.all %}
+                        <span class="badge bg-success">Joined Squad</span>
+                    {% elif team.pk in pending_team_ids %}
+                        <span class="badge bg-warning text-dark">Join Request Pending</span>
+                    {% else %}
+                        <form method="post" action="{% url 'scrims:team_join_request' team.pk %}" class="d-flex gap-2 mt-2">
+                            {% csrf_token %}
+                            <input type="text" name="message" class="form-control form-control-sm" placeholder="Optional role/rank note...">
+                            <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">Request to Join</button>
+                        </form>
+                    {% endif %}
+                {% endif %}
+
+                {% if user == team.manager or user.role == "ADMIN" %}
+                    {% if team.pending_requests %}
+                        <hr>
+                        <p class="small fw-semibold text-primary mb-2">Pending Join Requests ({{ team.pending_requests|length }}):</p>
+                        <ul class="list-group list-group-flush border rounded">
+                            {% for req in team.pending_requests %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                <div>
+                                    <span class="fw-semibold">{{ req.player.in_game_name|default:req.player.username }}</span>
+                                    <small class="text-muted">(@{{ req.player.username }})</small>
+                                    {% if req.message %}<div class="small text-muted">"{{ req.message }}"</div>{% endif %}
+                                </div>
+                                <form method="post" action="{% url 'scrims:team_join_respond' req.pk %}" class="d-flex gap-1">
+                                    {% csrf_token %}
+                                    <button type="submit" name="action" value="accept" class="btn btn-sm btn-success">Accept</button>
+                                    <button type="submit" name="action" value="reject" class="btn btn-sm btn-outline-danger">Decline</button>
+                                </form>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info">No teams available yet.</div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

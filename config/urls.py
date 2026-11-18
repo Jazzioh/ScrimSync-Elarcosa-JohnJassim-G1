@@ -8,6 +8,7 @@ urlpatterns = [
     path("", lambda request: redirect("accounts:role_redirect"), name="home"),
     path("admin/", admin.site.urls),
     path("accounts/", include("apps.accounts.urls")),
+    path("scrims/", include("apps.scrims.urls")),
 ]
 
 if settings.DEBUG:
